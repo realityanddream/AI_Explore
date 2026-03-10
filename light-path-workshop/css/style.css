@@ -1,0 +1,150 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: #050510;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    color: #aaccff;
+    overflow: hidden;
+}
+
+#game-wrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+}
+
+#game-container {
+    position: relative;
+    width: 960px;
+    height: 720px;
+    border: 1px solid rgba(60, 120, 200, 0.4);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+#game-container canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+#ui-panel {
+    width: 960px;
+    height: 80px;
+    background: rgba(10, 10, 30, 0.95);
+    border: 1px solid rgba(60, 120, 200, 0.4);
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 8px;
+}
+
+.element-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 70px;
+    height: 64px;
+    background: rgba(20, 30, 60, 0.8);
+    border: 1px solid rgba(60, 120, 200, 0.4);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    color: #aaccff;
+    font-size: 11px;
+    user-select: none;
+}
+
+.element-btn:hover {
+    background: rgba(30, 50, 90, 0.9);
+    border-color: rgba(80, 160, 255, 0.7);
+}
+
+.element-btn.selected {
+    background: rgba(40, 80, 140, 0.9);
+    border-color: #44aaff;
+    box-shadow: 0 0 12px rgba(68, 170, 255, 0.4);
+}
+
+.element-btn.disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.element-btn .icon {
+    font-size: 22px;
+    margin-bottom: 2px;
+}
+
+.element-btn .count {
+    font-size: 10px;
+    color: #88aacc;
+}
+
+#action-area {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.action-btn {
+    padding: 8px 20px;
+    background: rgba(20, 60, 120, 0.8);
+    border: 1px solid rgba(60, 140, 255, 0.5);
+    border-radius: 4px;
+    color: #aaccff;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+}
+
+.action-btn:hover {
+    background: rgba(30, 80, 160, 0.9);
+    border-color: #44aaff;
+    box-shadow: 0 0 8px rgba(68, 170, 255, 0.3);
+}
+
+.action-btn.primary {
+    background: rgba(20, 100, 60, 0.8);
+    border-color: rgba(60, 200, 120, 0.6);
+}
+
+.action-btn.primary:hover {
+    background: rgba(30, 130, 80, 0.9);
+    border-color: #44ff88;
+    box-shadow: 0 0 8px rgba(68, 255, 136, 0.3);
+}
+
+#hud {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    display: flex;
+    justify-content: space-between;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.hud-item {
+    background: rgba(10, 10, 30, 0.8);
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    border: 1px solid rgba(60, 120, 200, 0.3);
+}
