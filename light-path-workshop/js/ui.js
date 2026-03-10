@@ -1,5 +1,5 @@
 // ============================================================
-// 光路工坊 - UI 管理
+// 光路工坊 - UI 管理（能量制 + Tooltip + 快捷键）
 // ============================================================
 
 class UIManager {
@@ -7,45 +7,58 @@ class UIManager {
         this.game = game;
         this.panel = document.getElementById('ui-panel');
         this.selectedType = null;
-        this.placingPreview = null; // { type, orientation, direction, color }
+        this.placingPreview = null;
         this.tutorialShown = new Set();
     }
 
-    renderPanel(state, availableElements, currentWave) {
+    renderPanel(state, energy, gameSpeed) {
         this.panel.innerHTML = '';
 
-        if (state === STATE.LEVEL_SELECT || state === STATE.MENU) {
-            return;
-        }
+        if (state === STATE.LEVEL_SELECT || state === STATE.MENU) return;
 
         if (state === STATE.WIN || state === STATE.LOSE) {
             this.renderEndPanel(state);
             return;
         }
 
-        // 元素按钮
-        const elements = [
-            { type: ELEMENT.MIRROR, icon: '⟋', name: '反射镜' },
-            { type: ELEMENT.PRISM, icon: '△', name: '棱镜' },
-            { type: ELEMENT.COLOR_FILTER, icon: '◉', name: '滤镜' },
-            { type: ELEMENT.FOCUS_LENS, icon: '◎', name: '透镜' },
-            { type: ELEMENT.ENERGY_CRYSTAL, icon: '⬡', name: '晶体' }
+        const canOp = (state === STATE.PLANNING || state === STATE.BETWEEN_WAVES || state === STATE.WAVE_RUNNING);
+
+        // 元素购买按钮（按关卡可用列表过滤）
+        const allElements = [
+            { type: ELEMENT.LASER_SOURCE, key: '1' },
+            { type: ELEMENT.MIRROR, key: '2' },
+            { type: ELEMENT.PRISM, key: '3' },
+            { type: ELEMENT.COLOR_FILTER, key: '4' },
+            { type: ELEMENT.FOCUS_LENS, key: '5' },
+            { type: ELEMENT.ENERGY_CRYSTAL, key: '6' }
         ];
+        const available = this.game.currentLevelData && this.game.currentLevelData.availableElements;
+        const elements = available ? allElements.filter(e => available.includes(e.type)) : allElements;
 
         for (const el of elements) {
-            const count = availableElements[el.type] || 0;
+            const data = ELEMENT_DATA[el.type];
+            const canAfford = energy >= data.cost;
             const btn = document.createElement('div');
             btn.className = 'element-btn';
-            if (count <= 0) btn.classList.add('disabled');
+            if (!canAfford) btn.classList.add('disabled');
             if (this.selectedType === el.type) btn.classList.add('selected');
 
+            const costColor = canAfford ? '#88aacc' : '#ff6666';
             btn.innerHTML = `
-                <span class="icon">${el.icon}</span>
-                <span>${el.name}</span>
-                <span class="count">×${count}</span>
+                <span class="icon">${data.icon}</span>
+                <span>${data.name}</span>
+                <span class="count" style="color:${costColor}">${data.cost}</span>
             `;
 
-            if (count > 0 && (state === STATE.PLANNING || state === STATE.BETWEEN_WAVES)) {
+            // Tooltip on hover
+            btn.addEventListener('mouseenter', (e) => {
+                this.showPanelTooltip(btn, data, el.key);
+            });
+            btn.addEventListener('mouseleave', () => {
+                this.hidePanelTooltip();
+            });
+
+            if (canOp) {
                 btn.addEventListener('click', () => {
                     this.selectElement(el.type);
                 });
@@ -58,33 +71,43 @@ class UIManager {
         const actionArea = document.createElement('div');
         actionArea.id = 'action-area';
 
-        if (state === STATE.PLANNING || state === STATE.BETWEEN_WAVES) {
-            // 删除模式按钮
+        // 卖出按钮
+        if (canOp) {
             const delBtn = document.createElement('div');
-            delBtn.className = 'action-btn' + (this.selectedType === 'DELETE' ? ' selected' : '');
-            delBtn.textContent = '🗑 删除';
-            delBtn.style.cssText = this.selectedType === 'DELETE' ? 'border-color: #ff4444; box-shadow: 0 0 8px rgba(255,68,68,0.3);' : '';
+            delBtn.className = 'action-btn';
+            if (this.selectedType === 'DELETE') {
+                delBtn.style.cssText = 'border-color: #ff4444; box-shadow: 0 0 8px rgba(255,68,68,0.3);';
+            }
+            delBtn.textContent = '卖出[Q]';
             delBtn.addEventListener('click', () => {
                 this.selectedType = this.selectedType === 'DELETE' ? null : 'DELETE';
                 this.game.refreshUI();
             });
             actionArea.appendChild(delBtn);
-
-            const startBtn = document.createElement('div');
-            startBtn.className = 'action-btn primary';
-            startBtn.textContent = state === STATE.BETWEEN_WAVES ? '▶ 下一波' : '▶ 开始';
-            startBtn.addEventListener('click', () => {
-                this.game.startWave();
-            });
-            actionArea.appendChild(startBtn);
         }
 
-        if (state === STATE.WAVE_RUNNING) {
-            const info = document.createElement('span');
-            info.className = 'hud-item';
-            info.textContent = '波次进行中...';
-            info.style.marginLeft = 'auto';
-            actionArea.appendChild(info);
+        // 暂停/快进
+        if (state === STATE.WAVE_RUNNING || state === STATE.PAUSED) {
+            const pauseBtn = document.createElement('div');
+            pauseBtn.className = 'action-btn';
+            pauseBtn.textContent = state === STATE.PAUSED ? '继续[Space]' : '暂停[Space]';
+            pauseBtn.addEventListener('click', () => this.game.togglePause());
+            actionArea.appendChild(pauseBtn);
+
+            const speedBtn = document.createElement('div');
+            speedBtn.className = 'action-btn';
+            speedBtn.textContent = gameSpeed === 1 ? '快进[F]' : '正常[F]';
+            speedBtn.addEventListener('click', () => this.game.toggleSpeed());
+            actionArea.appendChild(speedBtn);
+        }
+
+        // 开始/下一波按钮
+        if (state === STATE.PLANNING || state === STATE.BETWEEN_WAVES) {
+            const startBtn = document.createElement('div');
+            startBtn.className = 'action-btn primary';
+            startBtn.textContent = state === STATE.BETWEEN_WAVES ? '下一波' : '开始';
+            startBtn.addEventListener('click', () => this.game.startWave());
+            actionArea.appendChild(startBtn);
         }
 
         this.panel.appendChild(actionArea);
@@ -98,7 +121,7 @@ class UIManager {
         if (state === STATE.WIN) {
             const nextBtn = document.createElement('div');
             nextBtn.className = 'action-btn primary';
-            nextBtn.textContent = '下一关 ▶';
+            nextBtn.textContent = '下一关';
             nextBtn.addEventListener('click', () => this.game.nextLevel());
             actionArea.appendChild(nextBtn);
         }
@@ -118,6 +141,57 @@ class UIManager {
         this.panel.appendChild(actionArea);
     }
 
+    showPanelTooltip(btn, data, key) {
+        this.hidePanelTooltip();
+        if (!btn || typeof btn.getBoundingClientRect !== 'function') return;
+
+        const tip = document.createElement('div');
+        tip.id = 'panel-tooltip';
+
+        let upgradeInfo = '';
+        if (data.desc.length > 1) {
+            upgradeInfo = `<div style="margin-top:6px;border-top:1px solid rgba(60,120,200,0.3);padding-top:4px;font-size:11px;color:#8899bb">`;
+            if (data.desc[1]) upgradeInfo += `Lv2: ${data.desc[1]} ($${data.upgrades[0]})<br>`;
+            if (data.desc[2]) upgradeInfo += `Lv3: ${data.desc[2]} ($${data.upgrades[1]})`;
+            upgradeInfo += '</div>';
+        }
+
+        tip.innerHTML = `
+            <div style="font-weight:bold;margin-bottom:4px">${data.name} <span style="color:#88aacc;font-weight:normal">[$${data.cost}] [${key}]</span></div>
+            <div style="font-size:12px;color:#aabbdd">${data.desc[0]}</div>
+            ${upgradeInfo}
+        `;
+
+        const rect = btn.getBoundingClientRect();
+        tip.style.cssText = `
+            position: fixed;
+            left: ${rect.left}px;
+            bottom: ${window.innerHeight - rect.top + 8}px;
+            background: rgba(8, 12, 30, 0.96);
+            color: #aaccff;
+            padding: 10px 14px;
+            border: 1px solid rgba(60, 140, 255, 0.5);
+            border-radius: 6px;
+            font-size: 13px;
+            z-index: 200;
+            max-width: 260px;
+            box-shadow: 0 0 15px rgba(20, 60, 140, 0.4);
+            pointer-events: none;
+        `;
+        document.body.appendChild(tip);
+    }
+
+    hidePanelTooltip() {
+        const old = document.getElementById('panel-tooltip');
+        if (old) old.remove();
+    }
+
+    // 在网格中展示已放置元素的信息（用于升级/卖出交互）
+    showElementInfo(el, px, py) {
+        // 通过 game 的 renderer 来显示，这里只做标记
+        // 实际 tooltip 在 renderer.renderElementTooltip 中绘制
+    }
+
     selectElement(type) {
         if (this.selectedType === type) {
             this.selectedType = null;
@@ -131,6 +205,8 @@ class UIManager {
 
     createPreviewForType(type) {
         switch (type) {
+            case ELEMENT.LASER_SOURCE:
+                return { type, direction: 'RIGHT', color: { ...COLORS.RED } };
             case ELEMENT.MIRROR:
                 return { type, orientation: '/' };
             case ELEMENT.PRISM:
@@ -149,6 +225,7 @@ class UIManager {
     clearSelection() {
         this.selectedType = null;
         this.placingPreview = null;
+        this.hidePanelTooltip();
     }
 
     showTutorial(messages, trigger) {

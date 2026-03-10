@@ -9,6 +9,7 @@ const LEVELS = [
         name: '光之初学',
         description: '学习使用反射镜引导激光照射敌人路径',
         gridSize: { cols: 12, rows: 10 },
+        startEnergy: 80,
         terrain: [
             [0,0,0,0,0,3,0,0,0,0,0,0],
             [0,0,0,0,0,1,0,0,0,0,0,0],
@@ -32,13 +33,7 @@ const LEVELS = [
         preplacedElements: [
             { type: 'LASER_SOURCE', col: 0, row: 4, direction: 'RIGHT', color: {r:1,g:0,b:0} }
         ],
-        availableElements: {
-            MIRROR: 5,
-            PRISM: 0,
-            COLOR_FILTER: 0,
-            FOCUS_LENS: 0,
-            ENERGY_CRYSTAL: 0
-        },
+        availableElements: ['MIRROR'],
         waves: [
             {
                 enemies: [
@@ -53,7 +48,7 @@ const LEVELS = [
         ],
         lives: 20,
         tutorial: [
-            { trigger: 'LEVEL_START', message: '将反射镜放在网格上，引导红色激光照射敌人路径！' },
+            { trigger: 'LEVEL_START', message: '用能量购买反射镜，引导红色激光照射敌人路径！击杀敌人获得能量。' },
             { trigger: 'FIRST_PLACE', message: '右键点击反射镜可以旋转方向（/ 和 \\ 切换）' }
         ]
     },
@@ -64,6 +59,7 @@ const LEVELS = [
         name: '分光之术',
         description: '用棱镜将光束分裂，覆盖分叉路径',
         gridSize: { cols: 14, rows: 10 },
+        startEnergy: 100,
         terrain: [
             [0,0,0,0,0,0,3,0,0,0,0,0,0,0],
             [0,0,0,0,0,0,1,0,0,0,0,0,0,0],
@@ -91,13 +87,7 @@ const LEVELS = [
         preplacedElements: [
             { type: 'LASER_SOURCE', col: 0, row: 5, direction: 'RIGHT', color: {r:1,g:0,b:0} }
         ],
-        availableElements: {
-            MIRROR: 4,
-            PRISM: 2,
-            COLOR_FILTER: 0,
-            FOCUS_LENS: 0,
-            ENERGY_CRYSTAL: 0
-        },
+        availableElements: ['LASER_SOURCE', 'MIRROR', 'PRISM'],
         waves: [
             {
                 enemies: [
@@ -119,7 +109,7 @@ const LEVELS = [
         ],
         lives: 20,
         tutorial: [
-            { trigger: 'LEVEL_START', message: '敌人路径分叉了！用棱镜分裂光束来覆盖两条路。' }
+            { trigger: 'LEVEL_START', message: '敌人路径分叉了！用棱镜分裂光束来覆盖两条路。可以购买新的激光源！' }
         ]
     },
 
@@ -129,6 +119,7 @@ const LEVELS = [
         name: '三原色',
         description: '不同颜色的敌人需要对应颜色的光束才能有效打击',
         gridSize: { cols: 14, rows: 10 },
+        startEnergy: 120,
         terrain: [
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
             [0,0,0,0,3,0,0,0,0,0,0,0,0,0],
@@ -154,13 +145,7 @@ const LEVELS = [
             { type: 'LASER_SOURCE', col: 0, row: 5, direction: 'RIGHT', color: {r:0,g:1,b:0} },
             { type: 'LASER_SOURCE', col: 13, row: 4, direction: 'LEFT', color: {r:0,g:0,b:1} }
         ],
-        availableElements: {
-            MIRROR: 5,
-            PRISM: 1,
-            COLOR_FILTER: 2,
-            FOCUS_LENS: 0,
-            ENERGY_CRYSTAL: 0
-        },
+        availableElements: ['LASER_SOURCE', 'MIRROR', 'PRISM', 'COLOR_FILTER'],
         waves: [
             {
                 enemies: [
@@ -195,6 +180,7 @@ const LEVELS = [
         name: '聚能攻防',
         description: '用聚焦透镜合束对抗装甲敌人，用蓄能晶体清理小怪群',
         gridSize: { cols: 14, rows: 10 },
+        startEnergy: 150,
         terrain: [
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0],
             [0,0,0,3,0,0,0,0,0,0,0,0,0,0],
@@ -220,13 +206,7 @@ const LEVELS = [
             { type: 'LASER_SOURCE', col: 0, row: 3, direction: 'RIGHT', color: {r:1,g:0,b:0} },
             { type: 'LASER_SOURCE', col: 0, row: 7, direction: 'RIGHT', color: {r:0,g:1,b:0} }
         ],
-        availableElements: {
-            MIRROR: 5,
-            PRISM: 1,
-            COLOR_FILTER: 1,
-            FOCUS_LENS: 1,
-            ENERGY_CRYSTAL: 1
-        },
+        availableElements: ['LASER_SOURCE', 'MIRROR', 'PRISM', 'COLOR_FILTER', 'FOCUS_LENS', 'ENERGY_CRYSTAL'],
         waves: [
             {
                 enemies: [
@@ -255,7 +235,7 @@ const LEVELS = [
         ],
         lives: 15,
         tutorial: [
-            { trigger: 'LEVEL_START', message: '装甲敌人很厚！用聚焦透镜合并多条光束增强威力。蓄能晶体充满后会自动释放范围爆炸。' }
+            { trigger: 'LEVEL_START', message: '装甲敌人很厚！用聚焦透镜合并多条光束增强威力。蓄能晶体充满后点击引爆！' }
         ]
     },
 
@@ -265,6 +245,7 @@ const LEVELS = [
         name: '影之迷宫',
         description: '暗影敌人会阻断光路！需要设计冗余光路来应对',
         gridSize: { cols: 16, rows: 12 },
+        startEnergy: 180,
         terrain: [
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
             [0,0,0,0,0,3,0,0,0,0,0,0,0,0,0,0],
@@ -293,13 +274,7 @@ const LEVELS = [
             { type: 'LASER_SOURCE', col: 0, row: 3, direction: 'RIGHT', color: {r:1,g:0,b:0} },
             { type: 'LASER_SOURCE', col: 15, row: 6, direction: 'LEFT', color: {r:0,g:0,b:1} }
         ],
-        availableElements: {
-            MIRROR: 6,
-            PRISM: 2,
-            COLOR_FILTER: 2,
-            FOCUS_LENS: 1,
-            ENERGY_CRYSTAL: 1
-        },
+        availableElements: ['LASER_SOURCE', 'MIRROR', 'PRISM', 'COLOR_FILTER', 'FOCUS_LENS', 'ENERGY_CRYSTAL'],
         waves: [
             {
                 enemies: [
@@ -337,7 +312,7 @@ const LEVELS = [
         ],
         lives: 15,
         tutorial: [
-            { trigger: 'LEVEL_START', message: '暗影敌人会阻断光路！设计多条光路作为备用方案。' }
+            { trigger: 'LEVEL_START', message: '暗影敌人会阻断光路！设计多条光路或升级聚焦透镜Lv3穿透暗影。' }
         ]
     }
 ];

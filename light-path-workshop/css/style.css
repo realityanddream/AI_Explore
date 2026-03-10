@@ -94,6 +94,14 @@ body {
     color: #88aacc;
 }
 
+.element-btn .name {
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 66px;
+}
+
 #action-area {
     margin-left: auto;
     display: flex;

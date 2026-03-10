@@ -1,5 +1,5 @@
 // ============================================================
-// 光路工坊 - 敌人系统
+// 光路工坊 - 敌人系统（含击杀奖励 & 减速）
 // ============================================================
 
 class Enemy {
@@ -8,9 +8,11 @@ class Enemy {
         this.type = type;
         this.hp = stats.hp;
         this.maxHp = stats.hp;
+        this.baseSpeed = stats.speed;
         this.speed = stats.speed;
         this.armor = stats.armor;
         this.radius = stats.radius;
+        this.reward = stats.reward;
         this.colorWeakness = colorWeakness || null;
 
         this.path = path;
@@ -23,13 +25,22 @@ class Enemy {
         this.reachedEnd = false;
 
         this.hitFlash = 0;
+        this.slowTimer = 0; // 减速剩余时间
+        this._exploded = false;
     }
 
     update(dt) {
         if (!this.alive || this.reachedEnd) return;
         if (this.hitFlash > 0) this.hitFlash -= dt;
 
-        // 沿路径移动
+        // 减速处理
+        if (this.slowTimer > 0) {
+            this.slowTimer -= dt;
+            this.speed = this.baseSpeed * 0.5;
+        } else {
+            this.speed = this.baseSpeed;
+        }
+
         const moveAmount = this.speed * CELL_SIZE * dt;
         let remaining = moveAmount;
 
@@ -57,7 +68,6 @@ class Enemy {
             }
         }
 
-        // 更新位置
         if (this.pathIndex >= this.path.length - 1) {
             this.x = this.path[this.path.length - 1].x;
             this.y = this.path[this.path.length - 1].y;
@@ -80,9 +90,16 @@ class Enemy {
             this.alive = false;
         }
     }
+
+    applySlow(duration) {
+        this.slowTimer = Math.max(this.slowTimer, duration);
+    }
+
+    isSlowed() {
+        return this.slowTimer > 0;
+    }
 }
 
-// 工厂函数
 function createEnemy(type, path, colorWeakness) {
     return new Enemy(type, path, colorWeakness);
 }

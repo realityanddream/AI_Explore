@@ -36,6 +36,7 @@ const STATE = {
     PLANNING: 'PLANNING',
     WAVE_RUNNING: 'WAVE_RUNNING',
     BETWEEN_WAVES: 'BETWEEN_WAVES',
+    PAUSED: 'PAUSED',
     WIN: 'WIN',
     LOSE: 'LOSE'
 };
@@ -52,21 +53,20 @@ const ELEMENT = {
 
 // 地形类型
 const TERRAIN = {
-    EMPTY: 0,      // 可放置
-    PATH: 1,       // 敌人路径（不可放置）
-    BLOCKED: 2,    // 障碍（不可放置）
-    ENTRANCE: 3,   // 入口
-    EXIT: 4        // 出口
+    EMPTY: 0,
+    PATH: 1,
+    BLOCKED: 2,
+    ENTRANCE: 3,
+    EXIT: 4
 };
 
-// 方向 (col, row) 增量
+// 方向
 const DIR = {
     UP:    { dc: 0,  dr: -1 },
     RIGHT: { dc: 1,  dr: 0  },
     DOWN:  { dc: 0,  dr: 1  },
     LEFT:  { dc: -1, dr: 0  }
 };
-
 const DIR_LIST = [DIR.UP, DIR.RIGHT, DIR.DOWN, DIR.LEFT];
 const DIR_NAMES = ['UP', 'RIGHT', 'DOWN', 'LEFT'];
 
@@ -81,19 +81,110 @@ const COLORS = {
     WHITE:   { r: 1, g: 1, b: 1 }
 };
 
-// 光束参数
+// ---- 光束参数 ----
 const MAX_BOUNCES = 50;
 const MIN_INTENSITY = 0.05;
-const REFLECT_DECAY = 0.95;
-const BEAM_DPS = 40;           // 每秒基础伤害
+const BEAM_DPS = 40;
 
-// 蓄能晶体参数
+// ---- 能量系统 ----
+const ENERGY_PASSIVE_RATE = 2.5;   // 每秒被动恢复
+const SELL_REFUND_RATE = 0.5;      // 卖出返还比例(按总投入)
+
+// ---- 元素成本 & 升级表 ----
+// cost: 购买成本, upgrades: [Lv2成本, Lv3成本]
+const ELEMENT_DATA = {
+    LASER_SOURCE: {
+        cost: 50,
+        upgrades: [40, 60],
+        name: '激光源',
+        icon: '▶',
+        desc: [
+            '持续发射光束，是唯一的伤害来源',
+            '强度提升至 1.5',
+            '强度提升至 2.0，可切换颜色'
+        ]
+    },
+    MIRROR: {
+        cost: 15,
+        upgrades: [15, 25],
+        name: '反射镜',
+        icon: '⟋',
+        desc: [
+            '将光束反射 90°，衰减 ×0.95',
+            '无损反射，衰减 ×1.0',
+            '增益反射，衰减 ×1.1'
+        ]
+    },
+    PRISM: {
+        cost: 30,
+        upgrades: [25, 35],
+        name: '棱镜',
+        icon: '△',
+        desc: [
+            '将光束分裂为 3 条，强度各 ÷3',
+            '衰减减少，强度各 ÷2.5',
+            '分裂为 5 条，强度各 ÷4'
+        ]
+    },
+    COLOR_FILTER: {
+        cost: 20,
+        upgrades: [20, 30],
+        name: '染色滤镜',
+        icon: '◉',
+        desc: [
+            '替换光束颜色为滤镜色(R/G/B)',
+            '叠加模式：输入色 + 滤镜色混合',
+            '叠加 + 穿透：原色光束继续直行'
+        ]
+    },
+    FOCUS_LENS: {
+        cost: 35,
+        upgrades: [30, 45],
+        name: '聚焦透镜',
+        icon: '◎',
+        desc: [
+            '合并多条光束，强度上限 2.0',
+            '上限 3.0，伤害 +20%',
+            '上限 4.0，可穿透暗影敌人'
+        ]
+    },
+    ENERGY_CRYSTAL: {
+        cost: 40,
+        upgrades: [30, 40],
+        name: '蓄能晶体',
+        icon: '⬡',
+        desc: [
+            '吸收光束充能，点击引爆或产能',
+            '充能/爆伤/产能 +50%',
+            '爆炸半径扩大，附加 2 秒减速'
+        ]
+    }
+};
+
+// 计算元素总投入(购买+已升级成本)
+function getElementTotalCost(type, level) {
+    const data = ELEMENT_DATA[type];
+    let total = data.cost;
+    for (let i = 0; i < level - 1 && i < data.upgrades.length; i++) {
+        total += data.upgrades[i];
+    }
+    return total;
+}
+
+function getUpgradeCost(type, currentLevel) {
+    const data = ELEMENT_DATA[type];
+    if (currentLevel >= 3 || currentLevel - 1 >= data.upgrades.length) return -1;
+    return data.upgrades[currentLevel - 1];
+}
+
+// ---- 蓄能晶体参数 ----
 const CRYSTAL_MAX_CHARGE = 100;
-const CRYSTAL_CHARGE_RATE = 30; // 每秒（强度1.0时）
-const CRYSTAL_BLAST_RADIUS = 2.5; // 格子半径
+const CRYSTAL_CHARGE_RATE = 30;
+const CRYSTAL_BLAST_RADIUS = 2.5;
 const CRYSTAL_BLAST_DAMAGE = 150;
+const CRYSTAL_ENERGY_YIELD = 30;  // 产能模式每次满充产出的能量
 
-// 敌人类型
+// ---- 敌人类型 ----
 const ENEMY_TYPE = {
     BASIC: 'BASIC',
     FAST: 'FAST',
@@ -102,16 +193,16 @@ const ENEMY_TYPE = {
     SHADOW: 'SHADOW'
 };
 
-// 敌人属性表
+// 敌人属性表(加入击杀奖励)
 const ENEMY_STATS = {
-    BASIC:          { hp: 100, speed: 1.0, armor: 0, radius: 0.3 },
-    FAST:           { hp: 60,  speed: 2.0, armor: 0, radius: 0.25 },
-    ARMORED:        { hp: 300, speed: 0.6, armor: 5, radius: 0.35 },
-    COLOR_SHIELDED: { hp: 150, speed: 0.8, armor: 0, radius: 0.3 },
-    SHADOW:         { hp: 200, speed: 0.7, armor: 0, radius: 0.35 }
+    BASIC:          { hp: 100, speed: 1.0, armor: 0, radius: 0.3, reward: 10 },
+    FAST:           { hp: 60,  speed: 2.0, armor: 0, radius: 0.25, reward: 8 },
+    ARMORED:        { hp: 300, speed: 0.6, armor: 5, radius: 0.35, reward: 25 },
+    COLOR_SHIELDED: { hp: 150, speed: 0.8, armor: 0, radius: 0.3, reward: 15 },
+    SHADOW:         { hp: 200, speed: 0.7, armor: 0, radius: 0.35, reward: 20 }
 };
 
-// 视觉颜色
+// ---- 视觉颜色 ----
 const VISUAL = {
     BG: '#0a0a1a',
     GRID_LINE: 'rgba(30, 60, 90, 0.3)',
@@ -130,7 +221,7 @@ const VISUAL = {
     UI_HIGHLIGHT: '#44aaff'
 };
 
-// 工具函数：颜色转 CSS 字符串
+// ---- 工具函数 ----
 function colorToCSS(c, alpha) {
     alpha = alpha !== undefined ? alpha : 1;
     return `rgba(${Math.round(c.r * 255)}, ${Math.round(c.g * 255)}, ${Math.round(c.b * 255)}, ${alpha})`;
@@ -141,6 +232,17 @@ function colorToHex(c) {
     const g = Math.round(c.g * 255).toString(16).padStart(2, '0');
     const b = Math.round(c.b * 255).toString(16).padStart(2, '0');
     return `#${r}${g}${b}`;
+}
+
+function colorName(c) {
+    if (c.r && !c.g && !c.b) return '红';
+    if (!c.r && c.g && !c.b) return '绿';
+    if (!c.r && !c.g && c.b) return '蓝';
+    if (c.r && c.g && !c.b) return '黄';
+    if (c.r && !c.g && c.b) return '品红';
+    if (!c.r && c.g && c.b) return '青';
+    if (c.r && c.g && c.b) return '白';
+    return '无';
 }
 
 function mixColors(colors) {

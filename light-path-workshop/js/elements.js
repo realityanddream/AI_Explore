@@ -1,8 +1,7 @@
 // ============================================================
-// 光路工坊 - 光学元素定义
+// 光路工坊 - 光学元素定义（含升级系统）
 // ============================================================
 
-// 元素工厂函数
 function createElement(type, col, row, direction, color, extra) {
     switch (type) {
         case ELEMENT.LASER_SOURCE:
@@ -28,13 +27,37 @@ class Element {
         this.type = type;
         this.col = col;
         this.row = row;
+        this.level = 1;
         this.preplaced = false;
+    }
+
+    canUpgrade() {
+        return this.level < 3;
+    }
+
+    getUpgradeCost() {
+        return getUpgradeCost(this.type, this.level);
+    }
+
+    getTotalInvested() {
+        return getElementTotalCost(this.type, this.level);
+    }
+
+    getSellValue() {
+        return Math.floor(this.getTotalInvested() * SELL_REFUND_RATE);
+    }
+
+    upgrade() {
+        if (this.canUpgrade()) {
+            this.level++;
+            return true;
+        }
+        return false;
     }
 
     rotate() {}
 
     onBeamHit(dirIn, color, intensity) {
-        // 返回 { outputs: [{ dc, dr, color, intensity }], absorbed: false }
         return { outputs: [], absorbed: false };
     }
 }
@@ -44,21 +67,42 @@ class LaserSource extends Element {
     constructor(col, row, direction, color) {
         super(ELEMENT.LASER_SOURCE, col, row);
         this.direction = direction || 'RIGHT';
-        this.color = color || COLORS.RED;
+        this.color = color ? { ...color } : { ...COLORS.RED };
     }
 
-    getEmitDir() {
-        return DIR[this.direction];
+    getEmitDir() { return DIR[this.direction]; }
+
+    getIntensity() {
+        if (this.level === 1) return 1.0;
+        if (this.level === 2) return 1.5;
+        return 2.0;
     }
 
     rotate() {
+        if (this.level >= 3) {
+            // Lv3: 右键循环切换颜色
+            if (this.color.r && !this.color.g && !this.color.b) {
+                this.color = { ...COLORS.GREEN };
+            } else if (!this.color.r && this.color.g && !this.color.b) {
+                this.color = { ...COLORS.BLUE };
+            } else {
+                this.color = { ...COLORS.RED };
+            }
+        } else {
+            // Lv1-2: 右键切换方向
+            const dirs = DIR_NAMES;
+            const idx = dirs.indexOf(this.direction);
+            this.direction = dirs[(idx + 1) % 4];
+        }
+    }
+
+    rotateDirection() {
         const dirs = DIR_NAMES;
         const idx = dirs.indexOf(this.direction);
         this.direction = dirs[(idx + 1) % 4];
     }
 
     onBeamHit() {
-        // 激光源不会被其他光束穿透，会阻挡
         return { outputs: [], absorbed: true };
     }
 }
@@ -67,7 +111,13 @@ class LaserSource extends Element {
 class Mirror extends Element {
     constructor(col, row, orientation) {
         super(ELEMENT.MIRROR, col, row);
-        this.orientation = orientation || '/'; // '/' 或 '\'
+        this.orientation = orientation || '/';
+    }
+
+    getDecay() {
+        if (this.level === 1) return 0.95;
+        if (this.level === 2) return 1.0;
+        return 1.1;
     }
 
     rotate() {
@@ -75,26 +125,18 @@ class Mirror extends Element {
     }
 
     onBeamHit(dirIn, color, intensity) {
-        const dc = dirIn.dc;
-        const dr = dirIn.dr;
+        const dc = dirIn.dc, dr = dirIn.dr;
         let outDc, outDr;
-
         if (this.orientation === '/') {
-            // / 型：(1,0)→(0,-1), (-1,0)→(0,1), (0,1)→(-1,0), (0,-1)→(1,0)
-            outDc = -dr;
-            outDr = -dc;
+            outDc = -dr; outDr = -dc;
         } else {
-            // \ 型：(1,0)→(0,1), (-1,0)→(0,-1), (0,1)→(1,0), (0,-1)→(-1,0)
-            outDc = dr;
-            outDr = dc;
+            outDc = dr; outDr = dc;
         }
-
         return {
             outputs: [{
-                dc: outDc,
-                dr: outDr,
+                dc: outDc, dr: outDr,
                 color: { ...color },
-                intensity: intensity * REFLECT_DECAY
+                intensity: intensity * this.getDecay()
             }],
             absorbed: false
         };
@@ -107,21 +149,32 @@ class Prism extends Element {
         super(ELEMENT.PRISM, col, row);
     }
 
-    rotate() {} // 棱镜不需要旋转
+    rotate() {}
 
     onBeamHit(dirIn, color, intensity) {
-        const dc = dirIn.dc;
-        const dr = dirIn.dr;
-        const splitIntensity = intensity / 3;
+        const dc = dirIn.dc, dr = dirIn.dr;
 
+        if (this.level <= 2) {
+            const divisor = this.level === 1 ? 3 : 2.5;
+            const si = intensity / divisor;
+            return {
+                outputs: [
+                    { dc, dr, color: { ...color }, intensity: si },
+                    { dc: -dr, dr: dc, color: { ...color }, intensity: si },
+                    { dc: dr, dr: -dc, color: { ...color }, intensity: si }
+                ],
+                absorbed: false
+            };
+        }
+        // Lv3: 5方向
+        const si = intensity / 4;
         return {
             outputs: [
-                // 直射
-                { dc, dr, color: { ...color }, intensity: splitIntensity },
-                // 左转 90°
-                { dc: -dr, dr: dc, color: { ...color }, intensity: splitIntensity },
-                // 右转 90°
-                { dc: dr, dr: -dc, color: { ...color }, intensity: splitIntensity }
+                { dc, dr, color: { ...color }, intensity: si },
+                { dc: -dr, dr: dc, color: { ...color }, intensity: si },
+                { dc: dr, dr: -dc, color: { ...color }, intensity: si },
+                { dc: -dc, dr: -dr, color: { ...color }, intensity: si },
+                { dc: -dr, dr: -dc, color: { ...color }, intensity: si }
             ],
             absorbed: false
         };
@@ -132,11 +185,10 @@ class Prism extends Element {
 class ColorFilter extends Element {
     constructor(col, row, filterColor) {
         super(ELEMENT.COLOR_FILTER, col, row);
-        this.filterColor = filterColor || COLORS.RED;
+        this.filterColor = filterColor ? { ...filterColor } : { ...COLORS.RED };
     }
 
     rotate() {
-        // 循环切换 R → G → B
         if (this.filterColor.r === 1 && this.filterColor.g === 0 && this.filterColor.b === 0) {
             this.filterColor = { ...COLORS.GREEN };
         } else if (this.filterColor.r === 0 && this.filterColor.g === 1 && this.filterColor.b === 0) {
@@ -147,16 +199,33 @@ class ColorFilter extends Element {
     }
 
     onBeamHit(dirIn, color, intensity) {
-        // 滤镜将输入颜色替换为滤镜颜色（保留强度）
-        return {
-            outputs: [{
-                dc: dirIn.dc,
-                dr: dirIn.dr,
-                color: { ...this.filterColor },
-                intensity: intensity
-            }],
-            absorbed: false
-        };
+        if (this.level === 1) {
+            return {
+                outputs: [{
+                    dc: dirIn.dc, dr: dirIn.dr,
+                    color: { ...this.filterColor },
+                    intensity
+                }],
+                absorbed: false
+            };
+        }
+        // Lv2+: 叠加模式
+        const mixed = mixColors([color, this.filterColor]);
+        const outputs = [{
+            dc: dirIn.dc, dr: dirIn.dr,
+            color: mixed,
+            intensity
+        }];
+        if (this.level >= 3) {
+            // Lv3: 穿透 — 原色继续直行
+            outputs.push({
+                dc: dirIn.dc, dr: dirIn.dr,
+                color: { ...color },
+                intensity: intensity * 0.7,
+                passthrough: true
+            });
+        }
+        return { outputs, absorbed: false };
     }
 }
 
@@ -168,8 +237,20 @@ class FocusLens extends Element {
         this.inputBuffer = [];
     }
 
-    getOutputDir() {
-        return DIR[this.direction];
+    getOutputDir() { return DIR[this.direction]; }
+
+    getMaxIntensity() {
+        if (this.level === 1) return 2.0;
+        if (this.level === 2) return 3.0;
+        return 4.0;
+    }
+
+    getDamageBonus() {
+        return this.level >= 2 ? 1.2 : 1.0;
+    }
+
+    canPenetrateShadow() {
+        return this.level >= 3;
     }
 
     rotate() {
@@ -178,12 +259,9 @@ class FocusLens extends Element {
         this.direction = dirs[(idx + 1) % 4];
     }
 
-    clearBuffer() {
-        this.inputBuffer = [];
-    }
+    clearBuffer() { this.inputBuffer = []; }
 
     onBeamHit(dirIn, color, intensity) {
-        // 存入缓冲区，不立即输出
         this.inputBuffer.push({ color: { ...color }, intensity });
         return { outputs: [], absorbed: true };
     }
@@ -191,14 +269,17 @@ class FocusLens extends Element {
     getOutput() {
         if (this.inputBuffer.length === 0) return null;
         const colors = this.inputBuffer.map(b => b.color);
-        const totalIntensity = Math.min(2.0, this.inputBuffer.reduce((s, b) => s + b.intensity, 0));
+        const totalIntensity = Math.min(
+            this.getMaxIntensity(),
+            this.inputBuffer.reduce((s, b) => s + b.intensity, 0)
+        );
         const mixed = mixColors(colors);
         const dir = this.getOutputDir();
         return {
-            dc: dir.dc,
-            dr: dir.dr,
+            dc: dir.dc, dr: dir.dr,
             color: mixed,
-            intensity: totalIntensity
+            intensity: totalIntensity * this.getDamageBonus(),
+            penetrateShadow: this.canPenetrateShadow()
         };
     }
 }
@@ -208,27 +289,46 @@ class EnergyCrystal extends Element {
     constructor(col, row) {
         super(ELEMENT.ENERGY_CRYSTAL, col, row);
         this.chargeLevel = 0;
-        this.maxCharge = CRYSTAL_MAX_CHARGE;
-        this.blastRadius = CRYSTAL_BLAST_RADIUS;
-        this.blastDamage = CRYSTAL_BLAST_DAMAGE;
         this.isCharging = false;
         this.justBlasted = false;
+        this.mode = 'blast'; // 'blast' 或 'energy'
     }
 
-    rotate() {} // 不需要旋转
+    getMaxCharge() { return CRYSTAL_MAX_CHARGE; }
+
+    getChargeRate() {
+        return this.level >= 2 ? CRYSTAL_CHARGE_RATE * 1.5 : CRYSTAL_CHARGE_RATE;
+    }
+
+    getBlastRadius() {
+        return this.level >= 3 ? 4.0 : CRYSTAL_BLAST_RADIUS;
+    }
+
+    getBlastDamage() {
+        return this.level >= 2 ? CRYSTAL_BLAST_DAMAGE * 1.5 : CRYSTAL_BLAST_DAMAGE;
+    }
+
+    getEnergyYield() {
+        return this.level >= 2 ? Math.floor(CRYSTAL_ENERGY_YIELD * 1.5) : CRYSTAL_ENERGY_YIELD;
+    }
+
+    appliesSlow() { return this.level >= 3; }
+
+    rotate() {
+        this.mode = this.mode === 'blast' ? 'energy' : 'blast';
+    }
 
     onBeamHit(dirIn, color, intensity) {
         this.isCharging = true;
-        // 不产生输出，光束被吸收
         return { outputs: [], absorbed: true, charging: true, intensity };
     }
 
     addEnergy(amount) {
-        this.chargeLevel = Math.min(this.maxCharge, this.chargeLevel + amount);
+        this.chargeLevel = Math.min(this.getMaxCharge(), this.chargeLevel + amount);
     }
 
     isFullyCharged() {
-        return this.chargeLevel >= this.maxCharge;
+        return this.chargeLevel >= this.getMaxCharge();
     }
 
     blast() {
@@ -237,6 +337,6 @@ class EnergyCrystal extends Element {
     }
 
     getChargePercent() {
-        return this.chargeLevel / this.maxCharge;
+        return this.chargeLevel / this.getMaxCharge();
     }
 }
